@@ -41,7 +41,7 @@ All inputs are free and public. Run the three download scripts in Google Colab (
 
 The scripts ask for your Space-Track login when run; no credentials are stored in this repository.
 
-Space-Track's user agreement does not allow redistributing TLEs, so the raw orbital data must be downloaded by each user. The derived densities, calibrated ballistic coefficients, storm list and forecast outputs are archived separately on Zenodo: DOI to be added.
+Space-Track's user agreement does not allow redistributing TLEs, so the raw orbital data must be downloaded by each user. The derived densities, calibrated ballistic coefficients, storm list and forecast outputs are archived on Zenodo: https://doi.org/10.5281/zenodo.23674144
 
 ### Folder layout
 
