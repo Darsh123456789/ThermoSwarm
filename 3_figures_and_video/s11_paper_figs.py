@@ -139,5 +139,8 @@ xb = np.arange(len(g)); a2.bar(xb - 0.18, g.unc, 0.36, color=GREY, label="NRLMSI
 a2.set_yscale("log"); a2.set_xticks(xb, g.index, rotation=30, fontsize=7); a2.set_ylabel("Median |error| (km)"); a2.set_xlabel("Altitude band (km)")
 for i, (u, b_) in enumerate(zip(g.unc, g.gbp)): a2.text(i, max(u, b_) * 1.25, f"−{100 * (1 - b_ / u):.0f}%", ha="center", fontsize=7)
 a2.legend(fontsize=6.5, loc="upper right"); a2.set_ylim(0.3, 80); lab(a2, "(c)")
+n_storms = S.group.nunique()          # storms with storm-time windows (14); not len(r3["groups"]), which is 15
+fig.suptitle(f"Drag-induced along-track error on {len(S):,} storm-time windows from {n_storms} held-out storms",
+             x=0.01, y=1.06, ha="left", fontsize=8, color="0.35")
 fig.savefig(f"{P}/fig7_forecast.pdf"); plt.close()
 print("figures done")
