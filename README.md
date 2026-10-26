@@ -77,6 +77,7 @@ Run from inside `2_analysis/`, in this order:
 | 8 | `s8_swarm_validation.py` | Independent validation against Swarm | `results_swarm.json`, `swarm_storms.csv` |
 | 8b | `s8b_validation_daily.py` | Daily network and Swarm ratios for Figure 3 | `$THERMOSWARM_ROOT/validation_daily.csv` |
 | 9 | `s9_reentry.py` | Re-entry date predictions at 7, 3 and 1 day | `results_reentry.json` |
+| 12 | `s12_discussion_stats.py` | Supporting statistics for Sections 6–7 (averaging, baseline vs storm strength, forecast by altitude, re-entry subsets) | `results_discussion.json` |
 
 Then, from `3_figures_and_video/`:
 
