@@ -8,6 +8,7 @@ authors:
 version: "1.0.1"
 date-released: "2026-10-27"
 license: MIT
+doi: "10.5281/zenodo.23673946"
 keywords:
   - thermospheric density
   - satellite drag

@@ -1,5 +1,7 @@
 # ThermoSwarm
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23673946.svg)](https://doi.org/10.5281/zenodo.23673946)
+
 Analysis code for the paper **"ThermoSwarm: Altitude-Resolved Storm-Time Thermospheric Density From Multi-Object Orbital Decay, With Physics-Informed Drag Forecasting"** by Darsh Chaudhary (submitted to *Space Weather*).
 
 The scripts turn about 1,100 already-tracked objects in low Earth orbit into a network of drag sensors. They invert public two-line element sets (TLEs) for thermospheric density against NRLMSIS 2.1, validate the result against ESA Swarm densities, test storm-time model bias and recovery, and train a physics-informed gradient-boosting drag forecaster.
@@ -113,7 +115,7 @@ Random seeds are set in each script, so reruns on the same input data give the s
 
 ## Citation
 
-If you use this code, please cite the paper and this software (see `CITATION.cff`). DOI: to be added after Zenodo archiving.
+If you use this code, please cite the paper and this software (see `CITATION.cff`): Chaudhary, D. (2026). *ThermoSwarm analysis code* (Version 1.0.1) [Software]. Zenodo. https://doi.org/10.5281/zenodo.23673946
 
 ## License
 
