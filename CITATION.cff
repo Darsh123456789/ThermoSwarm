@@ -4,11 +4,11 @@ title: "ThermoSwarm: analysis code for altitude-resolved storm-time thermospheri
 authors:
   - family-names: Chaudhary
     given-names: Darsh
-    affiliation: "Pathways School"
+    affiliation: "Pathways School Noida"
 version: "1.0.2"
 date-released: "2026-10-27"
 license: MIT
-doi: "10.5281/zenodo.23674628"
+doi: "10.5281/zenodo.23675174"
 keywords:
   - thermospheric density
   - satellite drag
