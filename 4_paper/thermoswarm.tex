@@ -1,0 +1,444 @@
+\documentclass[11pt]{article}
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{txfonts}
+\usepackage[left]{lineno}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{microtype}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+
+\captionsetup{font=small,labelfont=bf,labelsep=period,justification=justified}
+\titleformat{\section}{\normalfont\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}[runin]{\normalfont\normalsize\bfseries\itshape}{}{0em}{}[.]
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+\setlist{nosep,leftmargin=1.5em}
+\setlength{\parskip}{3pt}
+\renewcommand{\linenumberfont}{\normalfont\scriptsize\color{gray}}
+\usepackage{xcolor}
+
+% line numbers that also number lines around display equations
+\newcommand*\patchAmsMathEnvironmentForLineno[1]{%
+  \expandafter\let\csname old#1\expandafter\endcsname\csname #1\endcsname
+  \expandafter\let\csname oldend#1\expandafter\endcsname\csname end#1\endcsname
+  \renewenvironment{#1}{\linenomath\csname old#1\endcsname}{\csname oldend#1\endcsname\endlinenomath}}
+\newcommand*\patchBothAmsMathEnvironmentsForLineno[1]{%
+  \patchAmsMathEnvironmentForLineno{#1}\patchAmsMathEnvironmentForLineno{#1*}}
+\AtBeginDocument{\patchBothAmsMathEnvironmentsForLineno{equation}\patchBothAmsMathEnvironmentsForLineno{align}}
+
+\newcommand{\rhoobs}{\rho_{\mathrm{obs}}}
+\newcommand{\rhomsis}{\rho_{\mathrm{MSIS}}}
+\newcommand{\Kp}{\mathit{Kp}}
+\newcommand{\ap}{\mathit{ap}}
+
+\begin{document}
+\linenumbers
+
+\begin{center}
+{\LARGE\bfseries ThermoSwarm: Altitude-Resolved Storm-Time Thermospheric\\[2pt] Density from Multi-Object Orbital Decay, with\\[2pt] Physics-Informed Drag Forecasting\par}
+\vspace{10pt}
+{\large Darsh Chaudhary\par}
+{\normalsize Pathways School Noida\par}
+\end{center}
+\vspace{4pt}
+
+\begin{abstract}
+\noindent Geomagnetic storms heat and expand the thermosphere, increasing drag on satellites in low Earth orbit in ways that empirical density models capture imperfectly and degrading the orbit predictions used for collision avoidance and re-entry forecasting. This study treats 1,137 tracked objects between 197 and 786~km as a distributed drag-sensor network built from public data. From two-line element sets spanning October 2025 to October 2026, 187,223 orbit-averaged densities were inverted relative to NRLMSIS~2.1, with ballistic coefficients calibrated during geomagnetically quiet intervals. The network agreed closely with independent Swarm measurements (daily $r = 0.94$, 95\% CI 0.93--0.95; median difference 3.2\%). Contrary to the pre-registered hypothesis, NRLMSIS~2.1 did not underestimate storm-time density by more than 20\%: during the five storms reaching $\Kp \geq 7$, the median observed-to-model ratio at 300--550~km was 1.03 (95\% CI 0.96--1.16). Swarm data show that the model underestimated three-hour storm peaks by 73\%, but day-scale orbital averaging halves the visible rise and the model was often biased high before major storms. Recovery time constants of 3--5~h showed no resolvable altitude dependence. A physics-informed gradient-boosting forecaster, tested only on storms withheld from training, reduced the median 72-hour drag-induced along-track error from 3.30 to 2.68~km (19\%) and the RMS error by 22\%; re-entry predictions did not improve. The public catalogue can therefore monitor slowly varying model bias at no cost, whereas sub-daily storm peaks require faster orbit updates.
+
+\medskip\noindent\textbf{Keywords:} thermospheric density; satellite drag; two-line elements; geomagnetic storms; NRLMSIS~2.1; Swarm; space situational awareness; physics-informed machine learning
+\end{abstract}
+
+%=====================================================================
+\section{Introduction}
+
+Every object in low Earth orbit (LEO) moves through the thermosphere, the tenuous upper layer of the atmosphere whose density sets the drag that gradually lowers the orbit. Thermospheric density is governed by two energy sources: extreme-ultraviolet (EUV) radiation from the Sun, which varies over the 27-day solar rotation and the 11-year solar cycle, and energy deposited by the solar wind during geomagnetic storms. A storm can heat the upper atmosphere within hours, increasing density at a fixed altitude by tens of percent to several-fold. Because drag is proportional to density, these changes translate directly into errors in predicted satellite positions.
+
+The operational consequences are well documented. In February 2022, a moderate geomagnetic storm raised drag on a batch of newly launched Starlink satellites in a low parking orbit, and about 38 of the 49 re-entered before they could raise their orbits \citep{fang2022}. During major storms, thousands of catalogued objects drift from their predicted positions simultaneously, degrading conjunction screening precisely when prediction errors are largest. Re-entry forecasts and collision-avoidance decisions, which are now routine for agencies including the Indian Space Research Organisation's IS4OM space-safety programme, depend on drag predicted several days ahead. For predictions over this horizon, atmospheric density, rather than gravity modelling or spacecraft geometry, is the dominant source of uncertainty.
+
+Operators rely on empirical density models such as NRLMSIS~2.1 \citep{emmert2022} and JB2008 \citep{bowman2008}, which are known to be least reliable during storms. Direct density measurements from accelerometer- and GPS-equipped satellites such as Swarm are accurate \citep{vandenijssel2020}, but they sample only a few altitudes and are typically published weeks after the fact. Most of the altitude range in which satellites operate is therefore unobserved in real time.
+
+Every catalogued object, however, already records how the atmosphere acts on it: the rate at which its publicly released two-line element sets (TLEs) show its orbit shrinking is set by the air density along its path. A single object is a noisy probe, but hundreds of objects at different altitudes form a distributed sensor network built from freely available data. Density estimation from TLEs is an established technique \citep{picone2005,doornbos2008,emmert2015}. The contribution of this study is to integrate, within a single analysis of the 2025--2026 storms of Solar Cycle~25, (i) a large network of ordinary catalogued objects used as an altitude-resolved sensor, (ii) independent validation against direct satellite measurements over the same period, (iii) a physical model of the storm response, (iv) a machine-learning forecast of model error, and (v) an operational assessment expressed in kilometres of orbit-prediction error and days of re-entry error, with every test performed on storms excluded from training.
+
+The study had four objectives: to build an altitude-resolved monitor of model error from public data; to validate it against independent measurements; to quantify storm-time model error and thermospheric recovery; and to determine whether forecasting that error improves orbit and re-entry predictions. Three hypotheses, each with a numerical falsification criterion, were fixed before the analysis (Table~\ref{tab:hyp}).
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Pre-registered hypotheses and falsification criteria.}\label{tab:hyp}
+\begin{tabular}{@{}l>{\raggedright}p{7.4cm}>{\raggedright\arraybackslash}p{5.2cm}@{}}
+\toprule
+ & Prediction & Falsified if \\
+\midrule
+H1 & During storms reaching $\Kp \geq 7$, NRLMSIS~2.1 underestimates density at 300--550~km by more than 20\% & the 95\% CI of the median ratio lies within $\pm$10\% of 1 \\
+H2 & The storm recovery time constant $\tau$ decreases with altitude & the slope of $\tau$ against altitude is not significantly negative ($p \geq 0.05$) \\
+H3 & A physics-informed forecaster reduces 72-hour along-track error by at least 30\% on held-out storms & the reduction is below 10\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================================================
+\section{Background}
+
+\subsection{Drag and orbital decay}
+For a near-circular orbit of semi-major axis $a$ about a body with gravitational parameter $\mu$, atmospheric drag reduces the semi-major axis at the rate
+\begin{equation}
+\frac{da}{dt} = -\rho\, B \sqrt{\mu a}, \qquad B = \frac{C_D A}{m},
+\label{eq:decay}
+\end{equation}
+where $\rho$ is the air density and $B$ the ballistic coefficient, formed from the drag coefficient $C_D$, cross-sectional area $A$ and mass $m$. Equation~\eqref{eq:decay} is the basis of orbital densitometry: if the decay rate is measured and $B$ is known, $\rho$ follows. In practice neither quantity is known exactly, and $\rho$ varies around each orbit with latitude, local time and season, so density can be recovered only as an orbit average and only in combination with $B$.
+
+\subsection{Thermospheric structure and its response to heating}
+Above about 120~km the thermosphere is in diffusive equilibrium, and density decreases approximately exponentially with altitude $h$,
+\begin{equation}
+\rho(h) \approx \rho_0 \exp\!\left(-\frac{h-h_0}{H}\right), \qquad H = \frac{k_B T}{\bar{m} g},
+\label{eq:scale}
+\end{equation}
+where $H$ is the density scale height, $k_B$ Boltzmann's constant, $T$ the temperature, $\bar{m}$ the mean molecular mass and $g$ the gravitational acceleration. Heating increases $T$ and therefore $H$, lifting mass to higher altitudes. Because the factor $(h-h_0)/H$ grows with height, a given temperature increase produces a proportionally larger density increase at higher altitudes, which is why the relative storm response is expected to strengthen with altitude.
+
+Solar EUV heating, represented by the 10.7~cm radio flux $F_{10.7}$, controls the background state. Geomagnetic heating through Joule dissipation and particle precipitation at high latitudes, tracked by the planetary indices $\Kp$ and $\ap$ \citep{matzka2021}, controls the storm response. Cooling is equally important: storms enhance nitric oxide, which radiates efficiently at 5.3~\textmu m and can cool the thermosphere faster than it was heated \citep{mlynczak2003}. The energy entering the magnetosphere from the solar wind is well described by the coupling function of \citet{newell2007},
+\begin{equation}
+\frac{d\Phi_{MP}}{dt} = v^{4/3}\, B_T^{2/3} \sin^{8/3}\!\left(\frac{\theta}{2}\right),
+\label{eq:newell}
+\end{equation}
+where $v$ is the solar-wind speed, $B_T$ the transverse interplanetary magnetic field and $\theta$ the clock angle. This function responds before the geomagnetic indices do, making it a natural driver for a storm-response model.
+
+\subsection{Empirical models and orbital densitometry}
+NRLMSIS~2.0 and~2.1 \citep{emmert2021,emmert2022} and JB2008 \citep{bowman2008} map a small set of solar and geomagnetic indices to density. They reproduce average behaviour well but cannot represent storm-to-storm differences that those indices do not encode, and they respond only at the cadence of their inputs (three hours for $\ap$). The US Space Force's High Accuracy Satellite Drag Model (HASDM) corrects an empirical model in near-real time using the observed decay of about 75 calibration satellites \citep{storz2005}, demonstrating the value of tracked objects as density sensors, but its output is not publicly available in real time.
+
+TLEs are mean orbital elements fitted to several days of radar and optical tracking for use with the SGP4 propagator \citep{vallado2006}. \citet{picone2005} showed that the change in mean motion between two TLEs, compared with the change a density model predicts along the intervening trajectory, yields an orbit-averaged density ratio accurate to a few percent for well-behaved objects. \citet{doornbos2008} used the approach to calibrate density models, estimating each object's ballistic coefficient from periods in which the model is trusted, and \citet{emmert2015} reviews its application. Machine-learning corrections to empirical models trained on high-accuracy density data have also shown promise \citep{licata2022}. What these studies have rarely combined is a large network of ordinary objects, contemporaneous independent validation, and an operational test on unseen storms; this study provides that combination.
+
+%=====================================================================
+\section{Data}
+
+All data are public and cover 1 October 2025 to 11 October 2026 (Table~\ref{tab:data}).
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Data sources.}\label{tab:data}
+\begin{tabular}{@{}>{\raggedright}p{4.3cm}>{\raggedright}p{3.0cm}>{\raggedright\arraybackslash}p{6.9cm}@{}}
+\toprule
+Dataset & Source & Content and coverage \\
+\midrule
+Orbital elements, main network & Space-Track.org & 1.04 million unique TLEs for 1,433 objects \\
+Orbital elements, low-altitude set & Space-Track.org & 280,323 TLE records for 800 objects, 774 of which re-entered; decay dates to the day \\
+Geomagnetic and solar indices & GFZ Potsdam & 3-hourly $\Kp$ and $\ap$, 30-minute Hp30, daily $F_{10.7}$; full period \\
+Solar wind & NASA OMNIWeb \citep{king2005} & 5-minute speed, density, IMF $B_y$, $B_z$ and SYM-H; to 18 September 2026 \\
+Reference densities & ESA Swarm (DNSxPOD), via VirES & precise-orbit densities for Swarm A, B and C at 2-minute cadence; to 30 June 2026 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Selection of drag probes}
+Objects were drawn from the satellite catalogue with perigee above 200~km, apogee below 700~km and an apogee--perigee difference below 50~km, and with launch dates before September 2025 so that each had a complete calibration history. Constellations that manoeuvre routinely (Starlink, OneWeb, Kuiper, Qianfan and Guowang) and crewed stations were excluded. Within each 25-km altitude band, debris was preferred to rocket bodies and rocket bodies to payloads, because objects without propulsion cannot manoeuvre. This yielded 1,500 objects distributed evenly between 200 and 700~km. Because this main network was sparse below 350~km, a second set of 800 objects was added, comprising every non-constellation object that re-entered during the study period together with recently launched objects in low orbits. These objects serve both as low-altitude density probes and as the test set for re-entry prediction.
+
+\subsubsection{Independent reference}
+ESA derives thermospheric density from the non-gravitational accelerations revealed by the precise GPS orbits of the three Swarm satellites \citep{vandenijssel2020}. During the study period Swarm~A and~C flew side by side near 433~km and Swarm~B near 493~km; 99.9\% of samples were flagged as valid. Swarm data were used exclusively for validation and never entered calibration or training.
+
+\subsubsection{Storm catalogue}
+Storms were identified automatically as intervals with $\Kp \geq 5^-$, merged when separated by less than 24~h, and retained when the maximum reached at least $6^-$ ($\Kp$ is expressed in thirds; $9^- = 8.67$, equivalent to a NOAA G4 storm). Twenty storms satisfied this definition. The two earliest (2 and 18 October 2025) preceded the 30-day calibration history required by the method, leaving 18 storms with usable density data. The five strongest, which define the H1 sample, are listed in Table~\ref{tab:storms}.
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Storms reaching $\Kp \geq 7$ during the study period.}\label{tab:storms}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Storm peak (UT) & Maximum $\Kp$ & Maximum $\ap$ & Swarm coverage \\
+\midrule
+12 Nov 2025, 00:00 & $9^-$ & 300 & yes \\
+19 Jan 2026, 21:00 & $9^-$ (G4) & 300 & yes \\
+21 Mar 2026, 00:00 & $7_o$ & 132 & yes \\
+4 Jul 2026, 03:00 & $7_o$ & 132 & no \\
+10 Oct 2026, 15:00 & $7^+$ & 154 & no \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================================================
+\section{Methods}
+
+The analysis was implemented as a pipeline of Python programs (Figure~\ref{fig:pipeline}) using sgp4, pymsis (NRLMSIS~2.1), pandas, SciPy, XGBoost and SHAP. Every number reported here can be regenerated from the raw downloads; key parameters are listed in Appendix~\ref{app:params}.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.66\textwidth]{figs/fig1_pipeline.png}
+\caption{Analysis pipeline. All tests start from the same calibrated density ratio $R$. Space-weather drivers also feed the storm-response model (H2) and the forecaster (H3); Swarm data enter only at the validation stage.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Quality control}
+Raw TLE histories contain duplicates, poorly fitted sets and manoeuvres, each of which would masquerade as a density signal. Exact duplicates and sets less than 0.1~day apart were removed, and only near-circular orbits ($e < 0.01$) were retained, since the inversion assumes that each object samples a narrow altitude range. Semi-major-axis outliers lying more than five robust standard deviations from a seven-point running median were discarded. Because drag can only lower an orbit, any increase in semi-major axis greater than 0.3~km between successive sets was treated as a manoeuvre: isolated increases were excised with a four-day window, and objects with more than three were removed entirely (50 objects). After quality control, 1,281 objects (763,138 sets) remained in the main network and 313 objects (123,298 sets) in the low-altitude set.
+
+\subsection{Density inversion}
+Following \citet{picone2005}, successive TLEs one to three days apart (median 1.23~days) define an interval $[t_1, t_2]$. The observed quantity is the change in Brouwer mean motion, $\Delta n_{\mathrm{obs}} = n(t_2) - n(t_1)$. Along the SGP4 trajectory between the two epochs, the change predicted by NRLMSIS~2.1 per unit ballistic coefficient is
+\begin{equation}
+I = \int_{t_1}^{t_2} \frac{3}{2}\, n\, \rhomsis(\mathbf{r},t)\, \frac{v_{\mathrm{rel}}^{2}}{v}\, dt,
+\label{eq:integral}
+\end{equation}
+where $v$ is the inertial speed and $v_{\mathrm{rel}}$ the speed relative to the co-rotating atmosphere. The integral was evaluated at 96 points per interval, converting each position to geodetic coordinates and driving NRLMSIS~2.1 with the observed $F_{10.7}$ of the previous day, its 81-day centred mean, and the full seven-element $\ap$ history. The ratio
+\begin{equation}
+f = \frac{\Delta n_{\mathrm{obs}}}{I} = B\, \frac{\langle \rho_{\mathrm{true}} \rangle}{\langle \rhomsis \rangle}
+\label{eq:f}
+\end{equation}
+is the product of the effective ballistic coefficient and the interval-averaged ratio of true to modelled density. The main network produced 271,720 intervals before calibration.
+
+\subsection{Quiet-time calibration}
+The ballistic coefficient and the density ratio cannot be separated within a single interval. Following \citet{doornbos2008}, they were separated statistically by assuming that the model is unbiased on average during geomagnetically quiet conditions, defined as $\ap \leq 15$ throughout an interval and the preceding 24~h. For each object, the ballistic coefficient was estimated as the running median of $f$ over quiet intervals within $\pm 30$~days (at least eight required), and the density ratio follows as
+\begin{equation}
+R = \frac{f}{B_q}\approx\frac{\rhoobs}{\rhomsis}, \qquad B_q(t) = \operatorname*{median}_{\substack{\text{quiet},\ |t'-t|\leq 30\,\mathrm{d}}} f(t').
+\label{eq:R}
+\end{equation}
+Each object's measurement noise was estimated as the robust scatter (1.4826 times the median absolute deviation) of its quiet-time $R$; objects with scatter above 0.5 were discarded. Because $B_q$ is a running median, slow changes in an object's attitude, and any slow bias in the model, are absorbed into $B_q$. $R$ therefore measures departures from the model's own quiet-time level rather than absolute density, a deliberate trade-off examined in Section~\ref{sec:limits}.
+
+\subsection{Storm-time bias (H1)}
+The H1 sample comprised every interval of at most two days containing the peak of a storm with $\Kp \geq 7$, for objects at 300--550~km. The test statistic was the median $R$. Two 95\% confidence intervals were obtained from 2,000 bootstrap resamples: one resampling objects, which reflects measurement noise, and one resampling storms, which reflects storm-to-storm variability and is the more conservative choice with only five storms. As a complementary measure that removes the baseline, each object's storm-time ratio was compared with its own median in the window four to one days before onset, giving the relative storm rise
+\begin{equation}
+X = \frac{R_{\mathrm{storm}}}{R_{\mathrm{pre}}} - 1 .
+\label{eq:X}
+\end{equation}
+
+\subsection{Storm-response model (H2)}
+The storm response was represented as a driven relaxation,
+\begin{equation}
+\frac{d\delta}{dt} = \alpha(h)\, Q'(t) - \frac{\delta}{\tau(h)},
+\qquad
+\delta(t) = \alpha \int_{-\infty}^{t} Q'(t')\, e^{-(t-t')/\tau}\, dt',
+\label{eq:relax}
+\end{equation}
+where $\delta$ is the fractional density excess relative to the pre-storm level, $Q'$ is the Newell coupling function (Eq.~\ref{eq:newell}) minus its pre-storm median, $\alpha(h)$ is the altitude-dependent sensitivity and $\tau(h)$ the recovery time constant. For the 14 storms with solar-wind coverage, $\delta$ was integrated hourly from four days before onset to seven days after and then averaged over each TLE interval, so that model and data share the same temporal smoothing. In each 50-km band from 350 to 700~km, $\tau$ was found by grid search between 2 and 72~h and $\alpha$ by least squares with residuals clipped at three robust standard deviations. Confidence intervals for $\tau$ were obtained from 500 bootstrap resamples over storms, and the altitude trend was tested by regression across bands.
+
+\subsection{Independent validation}
+NRLMSIS~2.1 was evaluated at every valid Swarm sample with the same drivers used in the inversion. The Swarm ratio $\rho_{\mathrm{Swarm}}/\rhomsis$ was averaged into 3-hour bins and normalised by its own 30-day running quiet-time median, exactly as the network is calibrated. Network objects within $\pm 25$~km of each satellite's altitude were matched to the Swarm ratio averaged over the identical interval. Agreement was quantified both for individual intervals and for daily medians using Pearson and Spearman correlation, with a bootstrap confidence interval over days.
+
+\subsection{Seventy-two-hour forecast (H3)}
+The forecast target was the mean density ratio over the following 72~h, $R_{72}$, measured from TLE pairs 66--78~h apart, for each object and issue time $t_0$. All predictors were strictly causal: a ballistic coefficient estimated only from the preceding 30 days; the most recent and seven-day ratios; the Newell coupling averaged over 3, 6, 24 and 48~h; current and 24-hour maximum $\ap$ and $\Kp$; 24-hour minimum SYM-H; $F_{10.7}$ and its deviation from the 81-day mean; time since the most recent storm onset; and altitude. Five models of increasing complexity were compared: (1) the uncorrected model ($R = 1$); (2) persistence of the latest ratio; (3) a physics model, in which persistence is scaled by the relaxation forecast of Eq.~\eqref{eq:relax} with $\tau$ and $\alpha$ fitted on training storms only; (4) gradient boosting \citep[XGBoost;][]{chen2016}; and (5) gradient boosting supplied additionally with the physics forecast and the current storm state. Windows were grouped by their nearest storm and evaluated with four-fold grouped cross-validation, so that each storm was predicted by a model that had seen none of its windows.
+
+A density-ratio error becomes a position error through the double time-integral of drag. If the predicted product of ballistic coefficient and ratio differs from the observed value by $\Delta f$, the along-track displacement after time $T$ is
+\begin{equation}
+\Delta s = a\, \Delta f \int_{0}^{T} (T - t)\, g(t)\, dt,
+\label{eq:alongtrack}
+\end{equation}
+where $g$ is the per-unit-$B$ drag term of Eq.~\eqref{eq:integral} evaluated along the trajectory. This isolates the component of prediction error that an improved density estimate can remove. Skill is reported as the fractional reduction $1 - E_{\mathrm{model}}/E_{\mathrm{uncorrected}}$ in the median and root-mean-square (RMS) error, with confidence intervals from 1,000 bootstrap resamples over storms. Model behaviour was interpreted with SHAP values \citep{lundberg2017}.
+
+\subsection{Re-entry prediction}
+For objects that re-entered, the orbit was propagated forward from the last TLE before 7, 3 and 1~day prior to the recorded decay date by integrating Eq.~\eqref{eq:decay} with the orbit-averaged NRLMSIS~2.1 density (24 points per orbit), using steps that shortened from 1~h to 3~min as the object descended, until 120~km. The ballistic coefficient was fitted so that the model reproduced the object's own decay over the preceding five days, as operational centres do. The corrected run multiplied the model density by the network's recent ratio (other objects below 500~km over the last 1.5~days, relative to the fitting window), relaxing to unity with a two-day e-folding time fixed before results were examined. Both runs used observed drivers, so the comparison isolates the density correction itself.
+
+%=====================================================================
+\section{Results}
+
+\subsection{Characteristics of the network}
+After calibration, 1,137 objects provided 187,223 orbit-averaged density measurements between 197 and 786~km: 973 from the main network and 164 from the low-altitude set. The network is dominated by objects that cannot manoeuvre (523 debris fragments, 157 rocket bodies, 380 payloads, mostly inactive, and 77 unclassified objects). By median altitude, 5 objects lie below 300~km, 205 at 300--400~km, 274 at 400--500~km, 246 at 500--600~km, 387 at 600--700~km and 20 above 700~km.
+
+The calibration behaves as intended: the median quiet-time ratio is exactly 1.00. The typical noise of a single object over a single interval, measured by its quiet-time scatter, is 12\%, and it depends strongly on altitude (Spearman $\rho = 0.48$, $p < 10^{-60}$), rising from 7.9\% below 350~km to 9.8\% at 350--450~km, 11.9\% at 450--550~km and 14.2\% at 550--650~km. This is expected from Eq.~\eqref{eq:decay}: at higher altitudes the drag-induced change in mean motion over one to three days is smaller, so the fixed error of the TLE fitting process becomes a larger fraction of the signal. Object type matters far less (debris 12.5\%, rocket bodies 13.7\%, payloads 11.0\%). The single-object noise floor is the reason the method relies on averaging many objects.
+
+Figure~\ref{fig:map} shows the resulting record for the full year. Storms appear as vertical bands that span all altitudes simultaneously, indicating that independent objects respond coherently. Equally prominent are episodes lasting several weeks in which the ratio is persistently below or above unity at all altitudes, for example from December 2025 to mid-January 2026 and in early July 2026. These episodes represent a slowly varying bias in the model that is unrelated to individual storms, and they prove central to the interpretation of H1.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figs/fig2_map.pdf}
+\caption{Daily median density ratio $R = \rhoobs/\rhomsis$ in 25-km bands (top) and the 3-hourly $\ap$ index (bottom), October 2025 to October 2026. Red indicates more air than NRLMSIS~2.1 predicts and blue less. The strongest storms are labelled.}
+\label{fig:map}
+\end{figure}
+
+\subsection{Independent validation against Swarm}
+The network reproduces the Swarm measurements closely (Figure~\ref{fig:val}). Over 716 satellite-days, the daily median network ratio correlates with the Swarm ratio at $r = 0.94$ (95\% CI 0.93--0.95; Spearman 0.94), with a median ratio of 0.99 and a median absolute difference of 3.2\%. Agreement is essentially identical for the three satellites ($r = 0.939$, 0.939 and 0.940 for Swarm~A, B and C), even though Swarm~B flies 60~km higher than A and~C, indicating that the result is not specific to one altitude.
+
+At the level of individual objects and intervals, agreement is weaker but substantial: across 54,325 matched intervals from 466 objects, $r = 0.59$ (Spearman 0.79), with a median absolute difference of 5.1\% and a robust per-object scatter of 7.6\%. The contrast between the single-interval and daily statistics is informative. A daily value aggregates a median of 84 matched intervals; if the 5.1\% single-interval differences were independent, averaging would reduce them to about 0.6\%. The observed daily difference of 3.2\% is five times larger, which shows that the residual disagreement is dominated not by random TLE noise but by systematic effects common to all objects, principally the different temporal smoothing of multi-day orbital elements and 3-hour Swarm bins. This interpretation is confirmed in Section~\ref{sec:decomp}.
+
+Swarm also provides the absolute level that the network, by construction, cannot. During quiet conditions, NRLMSIS~2.1 overestimated density at Swarm altitudes by about 8\% (quiet-time median $\rho_{\mathrm{Swarm}}/\rhomsis$ = 0.921, 0.928 and 0.924 for Swarm~A, B and C).
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figs/fig3_validation.pdf}
+\caption{Validation against Swarm. (a) Daily median density ratio from network objects within 25~km of the Swarm altitudes (blue) and from Swarm normalised in the same way (grey), October 2025 to June 2026. (b) The same daily values plotted against each other; the dashed line marks equality.}
+\label{fig:val}
+\end{figure}
+
+\subsection{Storm-time model bias (H1)}
+H1 is not supported. During the five storms reaching $\Kp \geq 7$, the median ratio at 300--550~km was 1.03 (1,236 samples from 576 objects). The 95\% confidence interval is 1.01--1.04 when resampling objects and 0.96--1.16 when resampling storms. Because the upper bound of even the wider interval lies below 1.20, an underestimate exceeding 20\% is rejected. The strict falsification criterion, an interval within $\pm$10\% of unity, is not met either, because the storm-level interval extends to 1.16. The result is therefore best described as a rejection of the large underestimate predicted by H1, with residual uncertainty driven by the small number of strong storms.
+
+The individual storms differ widely: the median ratio was 1.19 for 21 March 2026, 1.10 for 12 November 2025, 0.99 for 10 October 2026, 0.96 for 4 July 2026 and only 0.81 for the G4 storm of 19 January 2026, the strongest of the year. That the most intense storm produced the lowest ratio is the central clue to interpreting H1.
+
+When the baseline is removed using Eq.~\eqref{eq:X}, a clear storm signal emerges: density at the peaks of the $\Kp \geq 7$ storms rose 24\% more than the model predicted relative to each object's own pre-storm level (95\% CI 22--25\%). Across all 18 storms, the relative rise increases with storm intensity (Spearman $\rho = 0.55$ between maximum $\Kp$ and rise, $p = 0.02$), as physically expected. It also depends on the state of the model before the storm (Figure~\ref{fig:storm}b): storms that began from a low baseline ratio rose more ($r = -0.49$, $p = 0.04$; slope $-0.52$, i.e.\ about five percentage points of additional rise for every 0.1 decrease in the baseline). Among the five $\Kp \geq 7$ storms, the three that began from low baselines (0.71--0.79) rose by 4--34\%, whereas the two beginning near unity (0.98--0.99) rose by $-3$\% and $+15$\%. The G4 storm of 19 January is the notable exception among the low-baseline cases, rising only 4\%; it also had the fewest matched intervals of the Swarm-covered storms (Table~\ref{tab:swarm}), consistent with its sharp, short-lived peak being especially poorly resolved by day-scale elements. Part of this relationship may reflect regression toward the mean, since a baseline that is anomalously low by chance will tend to recover, but it is consistent with the model under-predicting storm heating while also misrepresenting the background state.
+
+The storm-time ratio also decreases systematically with altitude (Figure~\ref{fig:storm}a), from about 1.05 below 350~km to 0.92--0.93 above 600~km. A Theil--Sen fit to all 11,014 storm-time intervals gives a slope of $-3.4$\% per 100~km (95\% CI $-3.7$ to $-3.1$\%). The model therefore slightly under-predicts storm-time density at the lowest altitudes and over-predicts it at the highest.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figs/fig4_storm_bias.pdf}
+\caption{(a) Storm-time density ratio by 50-km altitude band for intervals spanning the peaks of all 18 storms (median and interquartile range). (b) Relative storm rise (Eq.~\ref{eq:X}) against the pre-storm baseline ratio for each storm; red points mark storms with $\Kp \geq 7$, and the line is a least-squares fit.}
+\label{fig:storm}
+\end{figure}
+
+\subsection{Decomposing the storm signal with Swarm}\label{sec:decomp}
+The 3-hour resolution of Swarm separates two effects that partly cancel in day-scale orbital data (Table~\ref{tab:swarm}).
+
+The first is \emph{peak smoothing}. At 3-hour resolution, the highest Swarm ratio during the $\Kp \geq 7$ storms had a median of 1.73: at the moment of peak heating, NRLMSIS~2.1 underestimated density by 73\%. When the same Swarm record is averaged over 36~h, comparable to a TLE interval, the median storm rise relative to quiet conditions falls from 67\% to 32\%. More than half of the peak is therefore invisible at the resolution of orbital elements.
+
+The second is \emph{pre-storm bias}. Before several major storms, the model was already too high: before the G4 storm of 19 January 2026, the absolute Swarm ratio was 0.76, so the model overestimated density by 24\% before the storm began. The storm-time increase first had to offset this error before it could appear as an underestimate.
+
+When Swarm is averaged over exactly the same windows as the TLE intervals, it reproduces the network value storm by storm (Table~\ref{tab:swarm}), including the low value for the G4 storm (0.85 for Swarm against 0.79 for the network). The muted H1 result is therefore a genuine property of day-scale orbital data rather than a failure of the inversion. Figure~\ref{fig:cases} illustrates both effects: the January storm began from a ratio near 0.65 and briefly exceeded unity, whereas the March storm began near unity and produced a clear 25--30\% excess.
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Storm-by-storm comparison of Swarm and the TLE network for storms with Swarm coverage. Ratios are relative to NRLMSIS~2.1; ``same windows'' averages Swarm over the identical TLE intervals.}\label{tab:swarm}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Storm & Max $\Kp$ & \multicolumn{3}{c}{Swarm} & Network & Matched \\
+\cmidrule(lr){3-5}
+ & & pre-storm (absolute) & peak 3-h & same windows & (TLE) & intervals \\
+\midrule
+21 Mar 2026 & $7_o$ & 0.89 & 1.74 & 1.30 & 1.20 & 400 \\
+19 Jan 2026 (G4) & $9^-$ & 0.76 & 1.73 & 0.85 & 0.79 & 119 \\
+12 Nov 2025 & $9^-$ & 0.88 & 1.67 & 1.06 & 1.10 & 228 \\
+3 Apr 2026 & $6^+$ & 1.01 & 1.58 & 1.33 & 1.38 & 358 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figs/fig5_cases.pdf}
+\caption{Network density ratio in four altitude bands (12-hour medians) through (a) the G4 storm of 19--20 January 2026 and (b) the storm of 20--23 March 2026, with $\ap$ below. The short dip immediately before each onset is an artefact of TLE fitting, which spreads the abrupt increase in drag over the preceding interval.}
+\label{fig:cases}
+\end{figure}
+
+\subsection{Recovery time constants (H2)}
+H2 is not established. The relaxation model of Eq.~\eqref{eq:relax} explains about 20\% of the variance in the storm response at 350--500~km ($R^2$ = 0.20, 0.21 and 0.20) and 14\% at 500--550~km, but less than 10\% above 550~km, where the storm signal is small relative to the single-object noise documented above. Where the fit is constrained, the recovery times are short and statistically indistinguishable (Figure~\ref{fig:tau}): $\tau = 5$~h at 350--400~km (95\% CI 2--14~h), 4~h at 400--450~km (2--12~h), 3~h at 450--500~km and 5~h at 500--550~km. An ordinary regression across bands yields a slope of $-0.9$~h per 100~km, but the bootstrap interval of the slope ($-3.9$ to $+22.9$~h per 100~km) includes zero, and a regression restricted to the constrained bands gives $p = 0.43$. No altitude dependence can therefore be claimed.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.55\textwidth]{figs/fig6_tau.pdf}
+\caption{Fitted recovery time constant by altitude band with 95\% bootstrap intervals over storms. Blue: bands where the model explains at least 10\% of the variance; grey: unconstrained bands. The variance explained ($R^2$) is printed for each band.}
+\label{fig:tau}
+\end{figure}
+
+\subsection{Forecasting the model error (H3)}
+H3 is partially supported. On 15,801 storm-time windows from 15 held-out storms (out of 98,023 windows from 1,129 objects at 355--687~km), the physics-informed model reduced the median drag-induced 72-hour along-track error from 3.30 to 2.68~km (19\%; 95\% CI $-2$ to 32\%) and the RMS error from 55.2 to 42.9~km (22\%; 95\% CI $-3$ to 41\%) (Figure~\ref{fig:fc}a,b). These reductions exceed the 10\% falsification threshold but fall short of the 30\% target, and their confidence intervals include zero.
+
+The progression of models is informative. Persistence (1\% median reduction) and the physics model alone (2\%; 5\% in RMS) barely improve on the uncorrected model, because conditions change substantially within 72~h. Gradient boosting without the physics input achieved a slightly larger median reduction (22\%; 95\% CI 3--36\%) but a smaller RMS reduction (20\%). Adding the physics forecast therefore mainly reduced the largest errors, which dominate collision-screening risk.
+
+The benefit varies across storms and altitudes. The physics-informed model improved the median error for 10 of 14 storms, by up to 73\% (3 December 2025) and 45\% (4 July 2026), but worsened it for four, including the G4 storm of 19 January 2026 ($-64$\%, from only 64 windows) and the storm of 14 March 2026 ($-61$\%). The per-storm improvement is unrelated to storm intensity (Spearman $\rho = 0.03$, $p = 0.92$). By altitude (Figure~\ref{fig:fc}c), absolute errors are dominated by the lowest objects, where drag is strongest (median 19.0~km at 300--400~km against 0.8~km at 600--700~km), while the relative improvement grows with altitude, from 4\% at 300--400~km to 14\%, 23\% and 24\% in the successively higher bands. The forecaster also performed well outside storms, reducing the median error in quiet windows from 3.57 to 2.71~km (24\%) and the RMS error from 66.2 to 44.8~km (32\%).
+
+SHAP analysis identifies the physics-model forecast (mean $|$SHAP$|$ = 0.055) and the object's seven-day baseline ratio (0.042) as the most influential inputs, followed by the deviation of $F_{10.7}$ from its 81-day mean (0.020), $F_{10.7}$ itself (0.019) and the time since storm onset (0.009). The model thus relies most heavily on precisely the two error sources identified with Swarm: the storm response and the slowly varying baseline.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figs/fig7_forecast.pdf}
+\caption{Seventy-two-hour drag-induced along-track error on held-out storm-time windows. (a) Median and (b) RMS error for the five models. (c) Median error by altitude band for the uncorrected and physics-informed models (logarithmic scale), with the relative reduction above each pair.}
+\label{fig:fc}
+\end{figure}
+
+\subsection{Re-entry prediction}
+The density correction did not measurably improve re-entry dates (Table~\ref{tab:reentry}; 328 predictions for 132 objects). At every lead time the improvement is within $\pm$0.04~day, and the corrected prediction is better in only about half of cases. The correction factor differed from unity by more than 10\% in only 7--8\% of predictions, because re-entries rarely coincided with large network-wide departures. Both runs share a systematic timing bias that varies with lead time: predictions issued 7 days ahead re-entered a median of 0.56~day early, those issued 3 days ahead 0.71~day late, and those issued 1 day ahead 0.43~day early. Errors at all lead times are close to the $\pm$0.5-day floor imposed by decay dates recorded only to the day. For the 43 seven-day predictions in which a storm occurred during the forecast, the median error fell from 0.76 to 0.71~day, a sample too small for a firm conclusion.
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Re-entry date prediction with and without the network density correction.}\label{tab:reentry}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Lead time & Predictions & \multicolumn{2}{c}{Median $|$error$|$ (days)} & Improvement (days) & Corrected & Median signed \\
+\cmidrule(lr){3-4}
+ & & uncorrected & corrected & [95\% CI] & better & error (days) \\
+\midrule
+7 days & 103 & 0.68 & 0.71 & $-0.03$ [$-0.12$, $+0.08$] & 57\% & $-0.56$ \\
+3 days & 106 & 0.81 & 0.85 & $-0.04$ [$-0.10$, $+0.07$] & 49\% & $+0.71$ \\
+1 day & 119 & 0.62 & 0.61 & $+0.01$ [$-0.03$, $+0.04$] & 50\% & $-0.43$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================================================
+\section{Discussion}
+
+\subsection{The catalogue as a measuring instrument}
+The central result of this study is that roughly a thousand ordinary catalogued objects, most of them debris, measure the departure of the thermosphere from NRLMSIS~2.1 almost as well as a dedicated science mission at the same altitudes, once their individual noise is averaged. A daily correlation of 0.94 with Swarm, consistent across three satellites at two altitudes, indicates that the inversion, the quiet-time calibration and the manoeuvre rejection behave as intended. The analysis also defines the natural unit of the measurement. A single object over a single interval carries 8--14\% noise that grows with altitude; the network median over a day is accurate to about 3\%, and the remaining disagreement with Swarm is systematic rather than random. Unlike Swarm, the network spans the full 200--800~km range continuously, and its input data are released within hours rather than weeks. For most altitudes at which no science satellite operates, it is the only near-real-time measurement available.
+
+\subsection{Two timescales of model error}\label{sec:twotime}
+H1 predicted that NRLMSIS~2.1 would underestimate storm-time density by more than 20\%. At the resolution of orbital elements, it did not, and the reason is more informative than a simple confirmation would have been. H1 was physically correct about the instantaneous response: Swarm observed storm peaks 73\% above the model. Orbital elements, however, are multi-day fits, and averaging over about a day halves the visible storm rise. In addition, the model was often biased high before major storms, so that the storm-time increase first had to cancel an existing error. The strongest storm of the year consequently showed the lowest storm-time ratio. The dependence of the storm rise on the pre-storm baseline (Figure~\ref{fig:storm}b) shows that these two errors are not independent of how the analysis is framed: the same storm appears as an over- or under-prediction depending on whether it is measured against the model or against the preceding state.
+
+The practical conclusion is that model error has two components with different timescales: a slowly varying baseline bias lasting days to weeks, which the network measures well, and a fast storm-peak error lasting hours, which it cannot resolve. Operational corrections should treat them separately, using the catalogue for the former and solar-wind-driven models or higher-cadence tracking for the latter. The decrease of the storm-time ratio with altitude ($-3.4$\% per 100~km) is a further systematic feature. It could reflect an over-estimate of thermospheric expansion by the model at the highest altitudes or composition effects, such as the growing contribution of helium, that the quiet-time calibration cannot separate; a comparison with JB2008 would help to distinguish these explanations.
+
+\subsection{Recovery time constants}
+The recovery times of 3--5~h are short. Taken at face value, they are consistent with efficient cooling by nitric-oxide emission after storms \citep{mlynczak2003}, which can return the thermosphere to its pre-storm state faster than simple heating models suggest. The result must nevertheless be interpreted with the smoothing in mind. An interval of roughly 30~h cannot resolve a time constant of a few hours, so the fit is constrained mainly by the magnitude of the response rather than its shape; the wide bootstrap intervals and the absence of a detectable altitude trend reflect this. H2 is therefore a question that day-scale orbital data cannot answer.
+
+\subsection{Operational value of the forecast}
+Collision screening depends on the predicted miss distance and its uncertainty. When along-track uncertainty is underestimated, genuine close approaches can be screened out; when it is overestimated, operators respond to false alarms and expend propellant on unnecessary manoeuvres. Reducing storm-time RMS error from 55 to 43~km directly narrows the uncertainty that screening must cover. Three features support the robustness of this result: evaluation exclusively on storms excluded from training, strictly causal predictors, and reliance on physically meaningful inputs revealed by SHAP. The larger gains in quiet periods and at higher altitudes are consistent with the forecaster primarily correcting the slowly varying baseline bias, which the network measures well, rather than the storm peaks, which it does not. The failures on the most intense storms indicate that an operational system should fall back on the physics model, or flag low confidence, when conditions exceed the training range.
+
+Re-entry prediction did not improve because fitting the ballistic coefficient to the final five days of decay, as operational centres do, already absorbs the density error present during that period. The network correction can add value only when density changes between the fitting window and the forecast period, which occurred in fewer than one case in twelve. For re-entry, improved short-term storm forecasting is therefore likely to be more valuable than correcting the background density.
+
+\subsection{Applications}
+Several applications follow directly. Agencies developing space-safety capabilities without dedicated density satellites, such as India's IS4OM programme, could run this pipeline on modest computing resources using free data to obtain a daily, altitude-resolved index of model error. The correction can be applied as a density multiplier in existing propagators to narrow storm-time miss-distance uncertainty in conjunction screening. Constellation operators could use the real-time baseline bias to decide when to raise satellites from low parking orbits, the decision at stake in February 2022. Finally, a continuous, altitude-resolved record of model error through Solar Cycle~25, including the pre-storm bias identified here, provides data for improving the next generation of empirical models.
+
+%=====================================================================
+\section{Limitations}\label{sec:limits}
+\begin{enumerate}
+\item \textit{Time resolution.} TLE intervals average about 1.2~days and halve storm peaks. This is the dominant limitation and affects H1, H2 and the forecast.
+\item \textit{Relative rather than absolute density.} The quiet-time calibration absorbs slow model biases into the ballistic coefficient, so the network cannot detect, for example, the 8\% quiet-time overestimate measured by Swarm.
+\item \textit{Few strong storms.} Only five storms reached $\Kp \geq 7$, which widens every storm-level confidence interval and limits what the forecaster can learn about extreme events.
+\item \textit{Coverage.} Only five objects have median altitudes below 300~km, and Swarm validates only the 430--500~km range and ends on 30 June 2026.
+\item \textit{Hindcast design.} The forecast and re-entry tests used observed rather than forecast space-weather drivers; operational use with forecast drivers would degrade every model.
+\item \textit{Simplifications.} Along-track errors include only the drag-induced component, and re-entry propagation assumes circular orbits and a constant ballistic coefficient.
+\end{enumerate}
+
+\section{Future Work}
+The most direct improvement would be higher-cadence orbit data, such as operator-provided GPS ephemerides, to resolve storm peaks and recovery shapes. Extending the analysis to the 2024 maximum of Solar Cycle~25, which included a $\Kp = 9$ storm in May 2024, would roughly double the sample of strong storms. A comparison with JB2008, whose indices have already been obtained, would test whether the pre-storm bias and altitude trend are specific to NRLMSIS~2.1. A two-timescale correction, slow from the network and fast from the solar wind, follows naturally from Section~\ref{sec:twotime}, and running the pipeline daily with forecast drivers would test genuine operational skill as an open correction service.
+
+\section{Conclusions}
+The existing tracked population can serve as a validated, zero-cost monitor of thermospheric model error: 187,223 densities from 1,137 objects track independent Swarm measurements with a daily correlation of 0.94. The three pre-registered hypotheses yielded three distinct lessons. H1 was not supported, because two real errors partly cancel at day-scale resolution: storm peaks that the model underestimates by about 73\% are halved by orbital-element averaging, and the pre-storm baseline was frequently too high. H2 was not established, because recovery times of 3--5~h are too short for day-scale data to resolve by altitude. H3 was partially supported: a physics-informed forecaster reduced storm-time 72-hour along-track error by about one fifth on unseen storms, although re-entry predictions did not improve. Thermospheric model error has a slow component, which the public catalogue already measures and can correct, and a fast component, which requires faster orbit updates. Separating the two is the clearest path toward operational drag correction for programmes without dedicated density satellites.
+
+\section*{Acknowledgements}
+Orbital data were provided by Space-Track.org (18th and 19th Space Defense Squadrons). Geomagnetic and solar indices are from GFZ Potsdam; solar-wind data from NASA's OMNIWeb service at the Space Physics Data Facility; Swarm densities from the European Space Agency via the VirES service; and JB2008 indices from Space Environment Technologies.
+
+\section*{Conflict of Interest}
+The author declares no conflicts of interest relevant to this study.
+
+\begin{thebibliography}{17}
+\setlength{\itemsep}{1pt}\small
+\bibitem[Bowman et~al.(2008)]{bowman2008} Bowman, B.~R., Tobiska, W.~K., Marcos, F.~A., Huang, C.~Y., Lin, C.~S., \& Burke, W.~J. (2008). A new empirical thermospheric density model JB2008 using new solar and geomagnetic indices. \textit{AIAA/AAS Astrodynamics Specialist Conference}, AIAA 2008-6438.
+\bibitem[Chen \& Guestrin(2016)]{chen2016} Chen, T., \& Guestrin, C. (2016). XGBoost: A scalable tree boosting system. \textit{Proceedings of the 22nd ACM SIGKDD Conference}, 785--794.
+\bibitem[Doornbos et~al.(2008)]{doornbos2008} Doornbos, E., Klinkrad, H., \& Visser, P. (2008). Use of two-line element data for thermosphere neutral density model calibration. \textit{Advances in Space Research}, 41(7), 1115--1122.
+\bibitem[Emmert(2015)]{emmert2015} Emmert, J.~T. (2015). Thermospheric mass density: A review. \textit{Advances in Space Research}, 56(5), 773--824.
+\bibitem[Emmert et~al.(2021)]{emmert2021} Emmert, J.~T., et al. (2021). NRLMSIS 2.0: A whole-atmosphere empirical model of temperature and neutral species densities. \textit{Earth and Space Science}, 8, e2020EA001321.
+\bibitem[Emmert et~al.(2022)]{emmert2022} Emmert, J.~T., et al. (2022). NRLMSIS 2.1: An empirical model of nitric oxide incorporated into MSIS. \textit{Journal of Geophysical Research: Space Physics}, 127.
+\bibitem[Fang et~al.(2022)]{fang2022} Fang, T.-W., Kubaryk, A., Goldstein, D., et al. (2022). Space weather environment during the SpaceX Starlink satellite loss in February 2022. \textit{Space Weather}, 20.
+\bibitem[King \& Papitashvili(2005)]{king2005} King, J.~H., \& Papitashvili, N.~E. (2005). Solar wind spatial scales in and comparisons of hourly Wind and ACE plasma and magnetic field data. \textit{Journal of Geophysical Research}, 110, A02104.
+\bibitem[Licata et~al.(2022)]{licata2022} Licata, R.~J., Mehta, P.~M., Weimer, D.~R., Tobiska, W.~K., \& Yoshii, J. (2022). MSIS-UQ: Calibrated and enhanced NRLMSIS 2.0 model with uncertainty quantification. \textit{Space Weather}, 20.
+\bibitem[Lundberg \& Lee(2017)]{lundberg2017} Lundberg, S.~M., \& Lee, S.-I. (2017). A unified approach to interpreting model predictions. \textit{Advances in Neural Information Processing Systems}, 30.
+\bibitem[Matzka et~al.(2021)]{matzka2021} Matzka, J., Stolle, C., Yamazaki, Y., Bronkalla, O., \& Morschhauser, A. (2021). The geomagnetic Kp index and derived indices of geomagnetic activity. \textit{Space Weather}, 19, e2020SW002641.
+\bibitem[Mlynczak et~al.(2003)]{mlynczak2003} Mlynczak, M., et al. (2003). The natural thermostat of nitric oxide emission at 5.3~\textmu m in the thermosphere observed during the solar storms of April 2002. \textit{Geophysical Research Letters}, 30(21).
+\bibitem[Newell et~al.(2007)]{newell2007} Newell, P.~T., Sotirelis, T., Liou, K., Meng, C.-I., \& Rich, F.~J. (2007). A nearly universal solar wind--magnetosphere coupling function inferred from 10 magnetospheric state variables. \textit{Journal of Geophysical Research}, 112, A01206.
+\bibitem[Picone et~al.(2005)]{picone2005} Picone, J.~M., Emmert, J.~T., \& Lean, J.~L. (2005). Thermospheric densities derived from spacecraft orbits: Accurate processing of two-line element sets. \textit{Journal of Geophysical Research}, 110, A03301.
+\bibitem[Storz et~al.(2005)]{storz2005} Storz, M.~F., Bowman, B.~R., Branson, J.~I., Casali, S.~J., \& Tobiska, W.~K. (2005). High accuracy satellite drag model (HASDM). \textit{Advances in Space Research}, 36(12), 2497--2505.
+\bibitem[Vallado et~al.(2006)]{vallado2006} Vallado, D.~A., Crawford, P., Hujsak, R., \& Kelso, T.~S. (2006). Revisiting Spacetrack Report \#3. \textit{AIAA/AAS Astrodynamics Specialist Conference}, AIAA 2006-6753.
+\bibitem[van den IJssel et~al.(2020)]{vandenijssel2020} van den IJssel, J., Doornbos, E., Iorfida, E., March, G., Siemes, C., \& Montenbruck, O. (2020). Thermosphere densities derived from Swarm GPS observations. \textit{Advances in Space Research}, 65(7), 1758--1771.
+\end{thebibliography}
+
+\appendix
+\section{Key Parameters}\label{app:params}
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}>{\raggedright}p{3.6cm}>{\raggedright\arraybackslash}p{11.4cm}@{}}
+\toprule
+Stage & Parameters \\
+\midrule
+Quality control & $e < 0.01$; manoeuvre: increase in $a$ greater than 0.3~km between sets; at least 30 clean sets per object \\
+Inversion & TLE pairs 1--3 days apart; 96 integration points per interval \\
+Calibration & quiet: $\ap \leq 15$ over the interval and preceding 24~h; window $\pm$30 days with at least 8 quiet intervals; objects rejected if quiet-time scatter exceeds 0.5 \\
+Storm catalogue & $\Kp \geq 5^-$, merged within 24~h, maximum $\Kp \geq 6^-$ \\
+Statistics & bootstrap resamples: 2,000 (H1), 500 (H2), 1,000 (H3); $\tau$ grid 2--72~h \\
+Validation & network objects within $\pm$25~km of the Swarm altitude, identical intervals \\
+Forecast & 72-h horizon (TLE pairs 66--78~h apart); four-fold cross-validation grouped by storm; XGBoost with 400 trees, depth 5, learning rate 0.05, absolute-error loss on $\log R$ \\
+Re-entry & ballistic coefficient fitted over the preceding 5 days; correction relaxes with a 2-day e-folding time; re-entry at 120~km \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

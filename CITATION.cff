@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ThermoSwarm: analysis code for altitude-resolved storm-time thermospheric density from multi-object orbital decay"
+authors:
+  - family-names: Chaudhary
+    given-names: Darsh
+    affiliation: "Pathways School"
+version: "1.0.0"
+date-released: "2026-10-26"
+license: MIT
+keywords:
+  - thermospheric density
+  - satellite drag
+  - two-line elements
+  - geomagnetic storms
+  - NRLMSIS 2.1
+  - Swarm

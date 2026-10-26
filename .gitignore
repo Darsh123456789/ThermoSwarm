@@ -1,0 +1,14 @@
+# Data and outputs are not tracked (Space-Track terms do not allow redistributing TLEs)
+data/
+data2/
+swarm/
+thermoswarm/
+paper_tex/
+video_frames/
+*.parquet
+*.zip
+*.gz
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store

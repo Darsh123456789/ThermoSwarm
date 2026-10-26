@@ -1,0 +1,13 @@
+# Python 3.10+
+sgp4
+pymsis
+numpy
+pandas
+pyarrow
+scipy
+scikit-learn
+xgboost
+shap
+matplotlib
+requests
+python-docx   # 4_paper/make_docx.py only (also needs pandoc)

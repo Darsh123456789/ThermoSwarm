@@ -1,0 +1,8 @@
+{
+  "title": "ThermoSwarm: analysis code for altitude-resolved storm-time thermospheric density from multi-object orbital decay",
+  "upload_type": "software",
+  "description": "Python scripts that download public orbital and space-weather data, invert two-line element sets for thermospheric density against NRLMSIS 2.1, calibrate ballistic coefficients in quiet time, validate against ESA Swarm densities, test storm-time model bias and recovery, and train a physics-informed gradient-boosting drag forecaster. Accompanies the manuscript 'ThermoSwarm: Altitude-Resolved Storm-Time Thermospheric Density From Multi-Object Orbital Decay, With Physics-Informed Drag Forecasting' submitted to Space Weather.",
+  "creators": [{"name": "Chaudhary, Darsh", "affiliation": "Pathways School"}],
+  "license": "MIT",
+  "keywords": ["thermospheric density", "satellite drag", "two-line elements", "geomagnetic storms", "NRLMSIS 2.1", "Swarm", "space weather"]
+}
