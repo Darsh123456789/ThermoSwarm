@@ -75,11 +75,12 @@ Run from inside `2_analysis/`, in this order:
 | 5 | `s5_windows72.py` | 72-hour forecast windows and drag integrals | `windows72.parquet` |
 | 6 | `s6_forecast.py` | H3: model ladder, storm-wise cross-validation, along-track error, SHAP | `results_h3.json`, `forecast_results.parquet` |
 | 8 | `s8_swarm_validation.py` | Independent validation against Swarm | `results_swarm.json`, `swarm_storms.csv` |
+| 8b | `s8b_validation_daily.py` | Daily network and Swarm ratios for Figure 3 | `$THERMOSWARM_ROOT/validation_daily.csv` |
 | 9 | `s9_reentry.py` | Re-entry date predictions at 7, 3 and 1 day | `results_reentry.json` |
 
 Then, from `3_figures_and_video/`:
 
-- `s11_paper_figs.py`: Figures 2–7 of the paper (see note 2). Figure 1 (pipeline diagram) is a drawn image, `fig1_pipeline.png`.
+- `s11_paper_figs.py`: Figures 2–7 of the paper. Figure 1 (pipeline diagram) is a drawn image, `fig1_pipeline.png`.
 - `s7_figures.py`: earlier draft figures.
 - `s10_video_frames.py`: frames for the project video.
 
@@ -87,7 +88,6 @@ Then, from `3_figures_and_video/`:
 ### Notes
 
 1. **Low-altitude set.** Before step 2b, run the `parse` and `qc` functions from `s1_parse_qc.py` on `data2/tle_history_2.txt.gz` and save the result as `tles_clean_2.parquet`. Then concatenate `tles_clean.parquet` and `tles_clean_2.parquet` into `tles_clean_all.parquet` (used by step 5).
-2. **Figure 3 input.** `s11_paper_figs.py` and `s10_video_frames.py` read `validation_daily.csv` (daily network and Swarm density ratios) from `$THERMOSWARM_ROOT`. The script that writes this file is not yet included.
 
 ### Key parameters
 
