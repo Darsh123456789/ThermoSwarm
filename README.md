@@ -1,6 +1,6 @@
 # ThermoSwarm
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23673946.svg)](https://doi.org/10.5281/zenodo.23673946)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23674628.svg)](https://doi.org/10.5281/zenodo.23674628)
 
 Analysis code for the paper **"ThermoSwarm: Altitude-Resolved Storm-Time Thermospheric Density From Multi-Object Orbital Decay, With Physics-Informed Drag Forecasting"** by Darsh Chaudhary (submitted to *Space Weather*).
 
@@ -115,7 +115,7 @@ Random seeds are set in each script, so reruns on the same input data give the s
 
 ## Citation
 
-If you use this code, please cite the paper and this software (see `CITATION.cff`): Chaudhary, D. (2026). *ThermoSwarm analysis code* (Version 1.0.1) [Software]. Zenodo. https://doi.org/10.5281/zenodo.23673946
+If you use this code, please cite the paper and this software (see `CITATION.cff`): Chaudhary, D. (2026). *ThermoSwarm analysis code* (Version 1.0.1) [Software]. Zenodo. https://doi.org/10.5281/zenodo.23674628
 
 ## License
 
